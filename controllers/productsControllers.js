@@ -2,7 +2,8 @@ const fs = require('fs')
 // import database
 const { db } = require('../config/database')
 
-let getSQL = `SELECT * from tb_products;`, getImage = `SELECT * FROM tb_products_image`;
+let getSQL = `SELECT * from tb_products;`, getImage = `SELECT * FROM tb_products_image`; 
+let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus;`
 module.exports = {
     getProducts: (req, res) => {
         let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
@@ -26,7 +27,7 @@ module.exports = {
                 }
                 // looping results data product
                 results.forEach(item => {
-                    // membuat properti images untuk product
+                    // membuat properti images untuk psroduct
                     item.images = []
                     // looping results_image untuk dicocokkan dgn foreign key-nya
                     results_img.forEach(e =>{
@@ -37,9 +38,27 @@ module.exports = {
                     })
                 });
 
-                console.log(results)
+                // menambahkan data stok
+                db.query(getStok, (err_stk, results_stk) =>{
+                    if(err_stk){
+                        res.status(500).send({status: 'Error MySQL', messages: err_stok})
+                    }
 
-                res.status(200).send(results)
+                    results.forEach(i =>{
+                        i.stok = []
+                        results_stk.forEach(a =>{
+                            if(i.idProduk === a.idProduk){
+                                delete a.idProduk
+                                delete a.idstatus
+                                i.stok.push(a)
+                            }
+                        })
+                    })
+                    console.log(getStok)
+                    // console.log("results stok: ", results_stk)
+                    res.status(200).send(results)
+                })
+
             })
         })
     },
@@ -85,6 +104,7 @@ module.exports = {
                 res.status(500).send({ status: 'err get product from my sql', messages: err })
             }
             
+            // manfaatkan query join
             db.query(getSQL, (err, results) => {
                 if (err) {
                     res.status(500).send({ status: 'err get product from my sql', messages: err })
