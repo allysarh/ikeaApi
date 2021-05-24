@@ -4,6 +4,7 @@ const { db } = require('../config/database')
 
 let getSQL = `SELECT * from tb_products;`, getImage = `SELECT * FROM tb_products_image`; 
 let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus;`
+
 module.exports = {
     getProducts: (req, res) => {
         let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
