@@ -9,6 +9,6 @@ const router = express.Router()
 router.post('/add', productsControllers.addProducts)
 router.get('/read', productsControllers.getProducts)
 router.patch('/update/:id', productsControllers.updateProducts)
-router.delete('/delete/:id', productsControllers.deleteProducts)
+router.delete('/delete', productsControllers.deleteProducts)
 
 module.exports = router
