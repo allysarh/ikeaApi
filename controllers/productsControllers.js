@@ -2,116 +2,179 @@ const fs = require('fs');
 const { type } = require('os');
 const { join } = require('path');
 // import database
-const { db } = require('../config/database')
+const { db, dbQuery } = require('../config/database');
 
 
 module.exports = {
-    getProducts: (req, res) => {
-        let getSQL = `SELECT * from tb_products p where p.idstatus = 1;`, getImage = `SELECT * FROM tb_products_image`;
-        let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus where ps.idstatus=1;`
-        let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
-        console.log(typeof (hasil))
-        if (Object.keys(req.query).length > 0) {
-            getSQL = `SELECT * from tb_products WHERE ${hasil};`
-            console.log(getSQL)
-        } else {
-            getSQL = `SELECT * from tb_products p where p.idstatus = 1;`
+    getProducts: async (req, res) => {
+        try {
+            let getSQL = `SELECT * from tb_products p where p.idstatus = 1;`, getImage = `SELECT * FROM tb_products_image`;
+            let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus where ps.idstatus=1;`
+            let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
+            console.log(typeof (hasil))
+            if (Object.keys(req.query).length > 0) {
+                getSQL = `SELECT * from tb_products WHERE ${hasil};`
+                console.log(getSQL)
+            } else {
+                getSQL = `SELECT * from tb_products p where p.idstatus = 1;`
+            }
+
+            let get = await dbQuery(getSQL)
+            let getImg = await dbQuery(getImage)
+            let getStk = await dbQuery(getStok)
+            console.log("get", get)
+            console.log("get Img")
+            // get === results
+            get.forEach(item => {
+                // membuat properti images untuk product (nambahin image ke data result)
+                item.images = []
+
+                // looping results_image untuk dicocokkan dgn foreign key-nya
+                getImg.forEach(e => {
+                    // jika id sama, data results_img akan dimasukkan ke dalam properi baru item.images
+                    if (item.idProduk == e.idProduk) {
+                        item.images.push(e)
+                    }
+                })
+
+                item.stok = []
+                getStk.forEach(a => {
+                    if (item.idProduk === a.idProduk) {
+                        delete a.idProduk
+                        delete a.idstatus
+                        item.stok.push(a)
+                    }
+                })
+            });
+
+            res.status(200).send(get)
+
+        } catch (error) {
+            if (error) {
+                console.log(error)
+                res.status(500).send({ status: 'err get product from my sql', messages: err })
+            }
         }
 
         // bersifat asynchronous
-        db.query(getSQL, (err, results) => {
-            if (err) {
-                console.log(err)
-                res.status(500).send({ status: 'err get product from my sql', messages: err })
-            }
+        // db.query(getSQL, (err, results) => {
+        //     if (err) {
+        //         console.log(err)
+        //         res.status(500).send({ status: 'err get product from my sql', messages: err })
+        //     }
 
-            // menambahkan data image --> one to many
-            db.query(getImage, (err_img, results_img) => {
-                if (err_img) {
-                    res.status(500).send({ status: 'Error MySQL', messages: err_img })
-                }
-                // looping results data product
-                results.forEach(item => {
-                    // membuat properti images untuk psroduct
-                    item.images = []
-                    // looping results_image untuk dicocokkan dgn foreign key-nya
-                    results_img.forEach(e => {
-                        // jika id sama, data results_img akan dimasukkan ke dalam properi baru item.images
-                        if (item.idProduk == e.idProduk) {
-                            item.images.push(e.images)
-                        }
-                    })
-                });
+        //     // menambahkan data image --> one to many
+        //     db.query(getImage, (err_img, results_img) => {
+        //         if (err_img) {
+        //             res.status(500).send({ status: 'Error MySQL', messages: err_img })
+        //         }
+        //         // looping results data product
+        //         results.forEach(item => {
+        //             // membuat properti images untuk product (nambahin image ke data result)
+        //             item.images = []
 
-                // menambahkan data stok
-                db.query(getStok, (err_stk, results_stk) => {
-                    if (err_stk) {
-                        res.status(500).send({ status: 'Error MySQL', messages: err_stk })
-                    }
+        //             // looping results_image untuk dicocokkan dgn foreign key-nya
+        //             results_img.forEach(e => {
+        //                 // jika id sama, data results_img akan dimasukkan ke dalam properi baru item.images
+        //                 if (item.idProduk == e.idProduk) {
+        //                     item.images.push(e)
+        //                 }
+        //             })
+        //         });
 
-                    if(results_stk){
-                        results.forEach(i => {
-                            i.stok = []
-                            results_stk.forEach(a => {
-                                if (i.idProduk === a.idProduk) {
-                                    delete a.idProduk
-                                    delete a.idstatus
-                                    i.stok.push(a)
-                                }
-                            })
-                        })
-                        // console.log(getStok)
-                        // console.log("results stok: ", results_stk)
-                    }
-                    res.status(200).send(results)
-                })
+        //         // menambahkan data stok
+        //         db.query(getStok, (err_stk, results_stk) => {
+        //             if (err_stk) {
+        //                 res.status(500).send({ status: 'Error MySQL', messages: err_stk })
+        //             }
 
-            })
-        })
+        //             if (results_stk) {
+        //                 results.forEach(i => {
+        //                     i.stok = []
+        //                     results_stk.forEach(a => {
+        //                         if (i.idProduk === a.idProduk) {
+        //                             delete a.idProduk
+        //                             delete a.idstatus
+        //                             i.stok.push(a)
+        //                         }
+        //                     })
+        //                 })
+        //                 // console.log(getStok)
+        //                 // console.log("results stok: ", results_stk)
+        //             }
+        //             res.status(200).send(results)
+        //         })
+
+        //     })
+        // })
     },
-    addProducts: (req, res) => {
-        // console.log(req.body)
+    addProducts: async (req, res) => {
+        try {
+            // console.log(req.body.images) 
+            let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
+            let postImg = `INSERT into tb_products_image values `
+            let postStk = `INSERT into tb_products_stok values `
+            let dataImg = []
+            let post = await dbQuery(postProduk) 
+            req.body.images.forEach(item => {
+                dataImg.push(`(null, ${post.insertId}, ${db.escape(item.images)})`)
+            })
+            console.log(dataImg)
+            let dataStk = []
+            req.body.stok.forEach(item => {
+                dataStk.push(`(null, ${db.escape(item.type)}, 
+                ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
+            })
+            console.log(postImg+dataImg)
+            await dbQuery(postImg + dataImg)
+            await dbQuery(postStk + dataStk)
 
-        let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
-        let postImg = `INSERT into tb_products_image values `
-        let postStk = `INSERT into tb_products_stok values `
+            res.status(200).send("Insert product success!✅")
+        } catch (error) {
+            res.status(500).send({ status: 'err update product to my sql', messages: error })
+        }
 
-        db.query(postProduk, (err, results) => {
-            if (err) {
-                res.status(500).send({ status: 'Error MySQL', messages: err })
-            }
+        // sync
+        // let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
+        // let postImg = `INSERT into tb_products_image values `
+        // let postStk = `INSERT into tb_products_stok values `
 
-            if (results.insertId) {
-                // menjalankan insert untuk tb_products_img dan tb_produtcs_stk
-                // looping: setiap looping insert data, cara2: buat query multiple data
-                let dataImg = []
-                req.body.images.forEach(item => {
-                    dataImg.push(`(null, ${results.insertId}, ${db.escape(item)})`)
-                })
+        // db.query(postProduk, (err, results) => {
+        //     if (err) {
+        //         res.status(500).send({ status: 'Error MySQL', messages: err })
+        //     }
 
-                let dataStk = []
-                req.body.stok.forEach(item => {
-                    dataStk.push(`(null, ${db.escape(item.type)}, 
-                    ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${results.insertId})`)
-                })
-                console.log(postStk + dataStk) // string + array --> string
-                console.log(postImg + dataImg)
+        //     if (results.insertId) {
+        //         // menjalankan insert untuk tb_products_img dan tb_produtcs_stk
+        //         // looping: setiap looping insert data, cara2: buat query multiple data
+        //         let dataImg = []
+        //         req.body.images.forEach(item => {
+        //             dataImg.push(`(null, ${results.insertId}, ${db.escape(item)})`)
+        //         })
 
-                db.query(postImg + dataImg, (err_img, results_img) => {
-                    if (err_img) {
-                        res.status(500).send({ status: 'Error MySQL', messages: err_img })
-                    }
+        //         let dataStk = []
+        //         req.body.stok.forEach(item => {
+        //             dataStk.push(`(null, ${db.escape(item.type)}, 
+        //             ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${results.insertId})`)
+        //         })
+        //         console.log(postStk + dataStk) // string + array --> string
+        //         console.log(postImg + dataImg)
 
-                    db.query(postStk+dataStk, (err_stk, results_stk) =>{
-                        if (err_stk) {
-                            res.status(500).send({ status: 'Error MySQL', messages: err_stk })
-                        }
+        //         db.query(postImg + dataImg, (err_img, results_img) => {
+        //             if (err_img) {
+        //                 res.status(500).send({ status: 'Error MySQL', messages: err_img })
+        //             }
 
-                        res.status(200).send("Insert product success!✅")
-                    })
-                })
-            }
-        })
+        //             db.query(postStk + dataStk, (err_stk, results_stk) => {
+        //                 if (err_stk) {
+        //                     res.status(500).send({ status: 'Error MySQL', messages: err_stk })
+        //                 }
+
+        //                 res.status(200).send("Insert product success!✅")
+        //             })
+        //         })
+        //     }
+        // })
 
         // algoritma:
         // 1. melihat apakah ada stok di request body
@@ -187,28 +250,109 @@ module.exports = {
         //     res.status(200).send(results)
         // })
     },
-    updateProducts: (req, res) => {
-        let dataSearch = []
-        console.log("req body ==>", req.body)
-        for (prop in req.body) {
-            dataSearch.push(`${prop} = ${db.escape(req.body[prop])}`)
-        }
-        let updateSQL = `UPDATE tb_products set ${dataSearch.join(' , ')} where idProduk = ${req.params.id};`
-        console.log(updateSQL)
-        db.query(updateSQL, (err, results) => {
-            if (err) {
-                res.status(500).send({ status: 'err update product from my sql', messages: err })
+    updateProducts: async (req, res) => {
+        try {
+
+            console.log("data update:", req.body)
+            let { idProduk, nama, brand, deskripsi, harga, idstatus, images, stok } = req.body
+
+            // update images
+            let updateImages = images.map(item => `Update tb_products_image set images = ${db.escape(item.images)} where idproduct_image = ${db.escape(item.idproduct_image)};`)
+
+            // update stok
+            let updateStok = stok.map(item => `Update tb_products_stok set type = ${db.escape(item.type)}, qty = ${item.qty} where idproduk_stok = ${item.idproduk_stok};`)
+
+            // update master
+            let update = `UPDATE tb_products set nama = ${db.escape(nama)}, brand =${db.escape(brand)}, deskripsi = ${db.escape(deskripsi)}, harga = ${db.escape(harga)}, idstatus=${db.escape(idstatus)} where idProduk = ${db.escape(idProduk)};
+            ${updateImages.join('\n')}
+            ${updateStok.join('\n')}`
+            
+            await dbQuery(update)
+            
+            // GET ULANG
+            let getSQL = `SELECT * from tb_products p where p.idstatus = 1;`, getImage = `SELECT * FROM tb_products_image`;
+            let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus where ps.idstatus=1;`
+            let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
+            console.log(typeof (hasil))
+            if (Object.keys(req.query).length > 0) {
+                getSQL = `SELECT * from tb_products WHERE ${hasil};`
+                console.log(getSQL)
+            } else {
+                getSQL = `SELECT * from tb_products p where p.idstatus = 1;`
             }
 
-            db.query(getSQL, (err, results) => {
-                if (err) {
-                    res.status(500).send({ status: 'err get product from my sql', messages: err })
-                }
-                res.status(200).send(results)
-            })
-        })
+            let get = await dbQuery(getSQL)
+            let getImg = await dbQuery(getImage)
+            let getStk = await dbQuery(getStok)
+
+            // get === results
+            get.forEach(item => {
+                // membuat properti images untuk product (nambahin image ke data result)
+                item.images = []
+
+                // looping results_image untuk dicocokkan dgn foreign key-nya
+                getImg.forEach(e => {
+                    // jika id sama, data results_img akan dimasukkan ke dalam properi baru item.images
+                    if (item.idProduk == e.idProduk) {
+                        item.images.push(e)
+                    }
+                })
+
+                item.stok = []
+                getStk.forEach(a => {
+                    if (item.idProduk === a.idProduk) {
+                        delete a.idProduk
+                        delete a.idstatus
+                        item.stok.push(a)
+                    }
+                })
+            });
+
+            res.status(200).send(get)
+        } catch (error) {
+            res.status(500).send({ status: 'err update product to my sql', messages: error })
+        }
+        // db.query(update, (err, results) => {
+        //     if (err) {
+        //         res.status(500).send({ status: 'err update product to my sql', messages: err })
+        //     }
+
+        //     db.query(updateImages.join('\n'), (err_img, results_img) =>{
+        //         if (err_img) {
+        //             res.status(500).send({ status: 'err update product image to my sql', messages: err_img })
+        //         }
+
+        //         db.query(updateStok.join('\n'), (err_stk, results_stk) =>{
+        //             if(err_stk){
+        //                 res.status(500).send({status: 'Error update stok', messages: err_stk})
+        //             }
+        //             res.status(200).send("Update image success")
+        //         })
+        //     })
+        // })
+        // update satu baris
+        // let updateSQL = `UPDATE tb_products set ${dataSearch.join(' , ')} where idProduk = ${req.params.id};`
+        // let dataSearch = []
+        // console.log("req body ==>", req.body)
+        // for (prop in req.body) {
+        //     dataSearch.push(`${prop} = ${db.escape(req.body[prop])}`)
+        // }
+        // let updateSQL = `UPDATE tb_products set ${dataSearch.join(' , ')} where idProduk = ${req.params.id};`
+        // console.log(updateSQL)
+        // db.query(updateSQL, (err, results) => {
+        //     if (err) {
+        //         res.status(500).send({ status: 'err update product from my sql', messages: err })
+        //     }
+
+        //     db.query(getSQL, (err, results) => {
+        //         if (err) {
+        //             res.status(500).send({ status: 'err get product from my sql', messages: err })
+        //         }
+        //         res.status(200).send(results)
+        //     })
+        // })
     },
-    deleteProducts: (req, res) => {
+    deleteProducts: async (req, res) => {
         //DELETE 1 BARIS
         // console.log('DELETE PRODUK')
         // let delSQL = `UPDATE tb_products set qty = '0', status = 'Not Available' where idProduk = ${db.escape(req.params.id)};`
@@ -230,16 +374,67 @@ module.exports = {
         // DELETE MULTIPLE BARIS
         // data jangan dihapus cuma diganti jd non available, karena datanya bisa dipake di divisi lain
         // contoh: marketing
-        
-        console.log(req.query.id)
-        let delSQL = `UPDATE tb_products set idstatus = 2 where idProduk = ${req.query.id};`
-        console.log(delSQL)
-        db.query(delSQL, (err, results) =>{
-            if (err) {
-                res.status(500).send({ status: 'err delete product from my sql', messages: err })
-            }
 
+        // async
+
+        try {
+            let delSQL = `UPDATE tb_products set idstatus = 2 where idProduk = ${req.query.id};`
+            let del = await dbQuery(delSQL)
+            console.log("delete result", del)
             res.status(200).send("Delete product success ✅✅")
-        })
+
+        } catch (error) {
+            res.status(500).send({ status: 'err delete product from my sql', messages: error })
+
+        }
+        //sync
+        // console.log(req.query.id)
+        // let delSQL = `UPDATE tb_products set idstatus = 2 where idProduk = ${req.query.id};`
+        // console.log(delSQL)
+        // db.query(delSQL, (err, results) => {
+        //     if (err) {
+        //         res.status(500).send({ status: 'err delete product from my sql', messages: err })
+        //     }
+
+        //     res.status(200).send("Delete product success ✅✅")
+        // })
     }
+
+
 }
+
+// BACKUP UPDATE CONTROLLER SYNC
+// console.log("data update:", req.body)
+//         let { idProduk, nama, brand, deskripsi, harga, idstatus, images, stok } = req.body
+//         // ini boleh pake looping atau boleh manual, kalo pake looping pake kondisi sbg pembatas images dan stok nya
+//         let update = `UPDATE tb_products set nama = ${db.escape(nama)}, brand =${db.escape(brand)}, deskripsi = ${db.escape(deskripsi)},
+//         harga = ${db.escape(harga)}, idstatus=${db.escape(idstatus)} where idProduk = ${db.escape(idProduk)};`
+//         console.log(update)
+
+//         db.query(update, (err, results) => {
+//             if (err) {
+//                 res.status(500).send({ status: 'err update product to my sql', messages: err })
+//             }
+
+//             // update images dan stok
+//             // memanfaatkan looping untuk beberapa kali 
+//             let updateImages = images.map(item => `Update tb_products_image set images = ${db.escape(item.images)} where idproduct_image = ${db.escape(item.idproduct_images)};`)
+//             // for (let prop in images){
+//             //     updateImages.push(`Update tb_product_images`)
+//             // }
+//             console.log("update images query: ",updateImages)
+//             let updateStok = stok.map(item => `Update tb_products_stok set type = ${db.escape(item.type)}, qty = ${item.qty} where idproduk_stok = ${item.idproduk_stok};`)
+//             console.log("update stok:", updateStok)
+//             db.query(updateImages.join('\n'), (err_img, results_img) =>{
+//                 if (err_img) {
+//                     res.status(500).send({ status: 'err update product image to my sql', messages: err_img })
+//                 }
+
+//                 db.query(updateStok.join('\n'), (err_stk, results_stk) =>{
+//                     if(err_stk){
+//                         res.status(500).send({status: 'Error update stok', messages: err_stk})
+//                     }
+//                     res.status(200).send("Update image success")
+//                 })
+//             })
+//         })
