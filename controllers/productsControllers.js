@@ -10,6 +10,17 @@ module.exports = {
         try {
             let getSQL = `SELECT * from tb_products p where p.idstatus = 1;`, getImage = `SELECT * FROM tb_products_image`;
             let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus where ps.idstatus=1;`
+            let getProdKategori = `SELECT
+                idProduk, c1.idkategori, c1.kategori
+            FROM
+                kategori c1
+                    LEFT JOIN
+                kategori c2 ON c2.parentId = c1.idkategori
+            JOIN
+                produk_kategori pk ON pk.idkategori = c1.idkategori
+            WHERE
+                c2.idkategori IS NULL;`
+
             let hasil = Object.keys(req.query).reduce((all, item) => { all.push(item + " = " + `'${req.query[item]}'`); return all }, []).join(" AND ");
             console.log(typeof (hasil))
             if (Object.keys(req.query).length > 0) {
@@ -22,8 +33,9 @@ module.exports = {
             let get = await dbQuery(getSQL)
             let getImg = await dbQuery(getImage)
             let getStk = await dbQuery(getStok)
-            console.log("get", get)
-            console.log("get Img")
+            
+            getProdKategori = await dbQuery(getProdKategori)
+            console.log("get", getProdKategori)
             // get === results
             get.forEach(item => {
                 // membuat properti images untuk product (nambahin image ke data result)
@@ -45,8 +57,15 @@ module.exports = {
                         item.stok.push(a)
                     }
                 })
-            });
 
+                item.kategori = []
+                getProdKategori.forEach(b => {
+                    if (item.idProduk === b.idProduk) {
+                        item.kategori.push({ idkategori: b.idkategori, kategori: b.kategori})
+                    }
+                })
+                
+            });
             res.status(200).send(get)
 
         } catch (error) {
@@ -110,12 +129,37 @@ module.exports = {
     },
     addProducts: async (req, res) => {
         try {
-            // console.log(req.body.images) 
+            // console.log(req.body) 
             let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
             let postImg = `INSERT into tb_products_image values `
             let postStk = `INSERT into tb_products_stok values `
+            let postKategori = `INSERT into produk_kategori values `
+            // // get all id kategori dari child hingga parent (single path)
+            let kategori = `WITH RECURSIVE kategori_path (idkategori, kategori, parentId) AS
+            (
+                SELECT idkategori, kategori, parentId
+                    FROM kategori
+                    WHERE idkategori = ${req.body.idkategori} -- kategori paling bawah yg dipilih
+                    UNION ALL
+                SELECT c.idkategori, c.kategori, c.parentId
+                    FROM kategori_path AS cp JOIN kategori AS c
+                    ON cp.parentId = c.idkategori
+            )
+            SELECT * FROM kategori_path;`
+
+            kategori = await dbQuery(kategori)
+            // console.log("kategori", kategori)
+
+            let post = await dbQuery(postProduk)
+            // tambahkan query untuk insert data ke table product_category
+
+            let dataKategori = kategori.map(item => {
+                return `(null, ${post.insertId}, ${item.idkategori})`
+            })
+            console.log(postKategori + dataKategori)
+            await dbQuery(postKategori + dataKategori)
+
             let dataImg = []
-            let post = await dbQuery(postProduk) 
             req.body.images.forEach(item => {
                 dataImg.push(`(null, ${post.insertId}, ${db.escape(item.images)})`)
             })
@@ -125,7 +169,7 @@ module.exports = {
                 dataStk.push(`(null, ${db.escape(item.type)}, 
                 ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
             })
-            console.log(postImg+dataImg)
+            console.log(postImg + dataImg)
             await dbQuery(postImg + dataImg)
             await dbQuery(postStk + dataStk)
 
@@ -266,9 +310,9 @@ module.exports = {
             let update = `UPDATE tb_products set nama = ${db.escape(nama)}, brand =${db.escape(brand)}, deskripsi = ${db.escape(deskripsi)}, harga = ${db.escape(harga)}, idstatus=${db.escape(idstatus)} where idProduk = ${db.escape(idProduk)};
             ${updateImages.join('\n')}
             ${updateStok.join('\n')}`
-            
+
             await dbQuery(update)
-            
+
             // GET ULANG
             let getSQL = `SELECT * from tb_products p where p.idstatus = 1;`, getImage = `SELECT * FROM tb_products_image`;
             let getStok = `SELECT * from tb_products_stok ps JOIN status s on ps.idstatus = s.idstatus where ps.idstatus=1;`
@@ -400,6 +444,24 @@ module.exports = {
         // })
     }
 
+    , getKategori: async (req, res, next) => {
+        try {
+            let getKategori = `SELECT
+            c1.idkategori, c1.kategori
+        FROM
+            kategori c1
+        LEFT JOIN
+            kategori c2 ON c2.parentId = c1.idkategori
+        WHERE
+            c2.idkategori IS NULL;`
+
+            getKategori = await dbQuery(getKategori)
+            // console.log(getKategori)
+            res.status(200).send(getKategori)
+        } catch (error) {
+            next(error)
+        }
+    }
 
 }
 
@@ -438,3 +500,7 @@ module.exports = {
 //                 })
 //             })
 //         })
+
+/**
+ * SANDI GMAIL NODEMAIL : slrvfxqgzepsncka
+ */

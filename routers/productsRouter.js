@@ -10,5 +10,6 @@ router.post('/add', productsControllers.addProducts)
 router.get('/read', productsControllers.getProducts)
 router.patch('/update', productsControllers.updateProducts)
 router.delete('/delete', productsControllers.deleteProducts)
+router.get('/kategori', productsControllers.getKategori)
 
 module.exports = router

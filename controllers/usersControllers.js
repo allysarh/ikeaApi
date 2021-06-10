@@ -1,5 +1,7 @@
-const fs = require('fs');
-const { db, dbQuery } = require('../config/database')
+// const fs = require('fs');
+const { db, dbQuery, transporter, createToken  } = require('../config');
+const Crypto = require('crypto');
+
 module.exports = {
     getUsers: async (req, res) => {
         // async
@@ -11,9 +13,9 @@ module.exports = {
                 dataSearch.push(`${prop} = ${db.escape(req.query[prop])}`)
             }
             if (dataSearch.length > 0) {
-                getSQL = `SELECT * from tb_user WHERE ${dataSearch.join(' AND ')} AND idstatus = 3;`
+                getSQL = `SELECT * from tb_user WHERE ${dataSearch.join(' AND ')} AND idstatus = 11;`
             } else {
-                getSQL = `SELECT * from tb_user WHERE idstatus = 3;`
+                getSQL = `SELECT * from tb_user WHERE idstatus = 11;`
             }
 
             let getUser = await dbQuery(getSQL)
@@ -72,13 +74,13 @@ module.exports = {
         try {
             console.log("body:", req.body.email)
             if (req.body.email && req.body.password) {
-                let getSQL = `SELECT * from tb_user where email=${db.escape(req.body.email)} and password=${db.escape(req.body.password)};`
+                let getSQL = `SELECT id, username, email, password, role, status from tb_user u JOIN status s where u.idstatus = s.idstatus and email=${db.escape(req.body.email)} and password=${db.escape(req.body.password)};`
                 let getLogin = await dbQuery(getSQL)
                 console.log("getLogin", getLogin)
                 // menambahkan cart
                 let getCart = `SELECT c.idcart, c.id, p.idProduk, p.nama, p.harga, ps.type, ps.qty as qty_stok, ps.idproduk_stok, c.qty from cart c 
-            JOIN tb_products p on c.idProduk = p.idProduk 
-            JOIN tb_products_stok ps on ps.idproduk_stok = c.idproduk_stok where c.id = ${getLogin[0].id};`
+                JOIN tb_products p on c.idProduk = p.idProduk 
+                JOIN tb_products_stok ps on ps.idproduk_stok = c.idproduk_stok where c.id = ${getLogin[0].id};`
 
                 getCart = await dbQuery(getCart)
                 let getImg = `SELECT * from tb_products_image;`
@@ -96,11 +98,13 @@ module.exports = {
                 console.log(getCart)
                 getLogin[0].cart = getCart
 
+                console.log("get login: ",getLogin)
+
                 res.status(200).send(getLogin)
             }
-            res.status(404).send("Not found")
+            
         } catch (error) {
-            res.status(500).send("Error login")
+            res.status(500).send("error")
         }
         //sync
         // console.log("login")
@@ -120,17 +124,50 @@ module.exports = {
         //     res.status(404).send({ status: 'Query not found' })
         // }
     },
-    register: async (req, res) => {
+    register: async (req, res, next) => {
         try {
-            console.log(req.body)
+            // membuat OTP
+            let char = '0123456789abcdefghijklmnoprstuvwxyz'
+            let OTP = ''
+
+            for(let i =0; i<6; i++){
+                OTP += char.charAt(Math.floor(Math.random() * char.length))
+            }
             let getSQL = `SELECT * from tb_user;`
-            let insertSQL = `INSERT INTO tb_user (username, email, password) values (${db.escape(req.body.username)}, ${db.escape(req.body.email)}, ${db.escape(req.body.password)});`
+
+            // hashing password
+            let hashPassword = Crypto.createHmac("sha256", "ikeak$$$").update(req.body.password).digest("hex")
+
+            // fungsi register
+            let insertSQL = `INSERT INTO tb_user (username, email, password, otp) values (${db.escape(req.body.username)}, ${db.escape(req.body.email)}, ${db.escape(hashPassword)}, ${db.escape(OTP)});`
             console.log(insertSQL)
             let register = await dbQuery(insertSQL)
-            res.status(200).send("Register success!")
+
+            let getUser = await dbQuery(`Select * from tb_user where id = ${register.insertId}`)
+            let { iduser, username, email, role, idstatus, otp } = getUser[0]
+
+            // fungsi untuk membuat token --> dilewati dulu
+            // token untuk proteksi
+            let token = createToken({id, username, email, role, idstatus})
+
+            // Membuat konfigurasi untuk email
+            // 1. kontent email
+            let mail = {
+                from: 'Admin Ikea <allysa.rahagustiani@gmail.com>', // sernder sesuai konfig nodemailer
+                to: email,// penerima sesuai data select dari db
+                subject: '[IKEA WEB]: Verification email', // subject email
+                html: `<div style="text-align: 'center';">Your OTP: <b>${OTP}</b>
+                <a href='http://localhost:3000/verif/${token}'>Verify your email</a>
+                </div>`
+            }
+            // 2. konfig transporter
+            await transporter.sendMail(mail)
+            res.status(200).send({success: true, message: 'Register success ✅✅'})
         } catch (error) {
-            res.status(500).send(error)
+            next(error)
         }
+
+        // tanpa async
         // console.log("register")
         // let getSQL = `SELECT * from tb_user;`
         // let insertSQL = `INSERT INTO tb_user (username, email, password) 
@@ -189,5 +226,49 @@ module.exports = {
         //     }
         //     res.status(200).send(results)
         // })
+    },
+    verifyOtp: async (req, res, next) =>{
+        try {
+            let get = `SELECT * from tb_user where otp = ${db.escape(req.body.otp)};`
+            get = await dbQuery(get)
+
+            if(get.length > 0){
+                let update = `UPDATE tb_user set idstatus = 11 where id = ${db.escape(get[0].id)};`
+                await dbQuery(update)
+            }
+            res.status(200).send({status: 200, message: get.length})
+
+        } catch (error) {
+            next(error)
+        }
+        
+    },
+    reVerif: async (req, res, next) =>{
+        try {
+            let char = '0123456789abcdefghijklmnoprstuvwxyz'
+            let OTP = ''
+
+            for(let i =0; i<6; i++){
+                OTP += char.charAt(Math.floor(Math.random() * char.length))
+            }
+
+            let updateOTP = `UPDATE tb_user set otp = ${db.escape(OTP)} where email = ${db.escape(req.body.email)};`
+            await dbQuery(updateOTP)
+
+            let mail = {
+                from: 'Admin Ikea <allysa.rahagustiani@gmail.com>', 
+                to: req.body.email,// penerima sesuai data select dari db
+                subject: '[IKEA WEB]: Verification email', // subject email
+                html: `<div style="text-align: 'center';">Your OTP: <b>${OTP}</b>
+                <a href='http://localhost:3000/verif'>Verify your email</a>
+                </div>`
+            }
+        
+            await transporter.sendMail(mail)
+
+            res.status(200).send("Berhasil✅✅")
+        } catch (error) {
+            console.log(error)
+        }
     }
 }

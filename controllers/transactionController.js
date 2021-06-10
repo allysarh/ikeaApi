@@ -72,7 +72,8 @@ module.exports = {
     },
     getTransactions: async (req, res, next) => {
         try {
-            let trans = `SELECT idtransaction, invoice, date, id, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus ${req.params.id > 0 ? `where id = ${req.params.id};` : ';'};`
+            // let trans = `SELECT idtransaction, invoice, date, id, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus ${req.params.id > 0 ? `where id = ${req.params.id};` : ';'};`
+            let trans = `SELECT idtransaction, invoice, date, t.id, username, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus join tb_user u on t.id = u.id ${req.params.id > 0 ? `where t.id = ${req.params.id};` : ';'};`
             trans = await dbQuery(trans)
 
             console.log("id --->>>", trans[0].idtransaction)

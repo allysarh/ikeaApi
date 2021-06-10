@@ -7,5 +7,6 @@ router.get('/get-all', usersControllers.getUsers)
 router.post('/login', usersControllers.login)
 router.post('/register', usersControllers.register)
 router.post('/keep', usersControllers.keepLogin)
-
+router.post('/verifyOTP', usersControllers.verifyOtp)
+router.post('/verif-ulang', usersControllers.reVerif)
 module.exports = router

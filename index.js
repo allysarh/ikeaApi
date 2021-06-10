@@ -6,9 +6,11 @@ const { db } = require('./config/database')
 const { userRouter, productsRouter, transactionRouter } = require('./routers')
 // cors --> config supaya FE bisa mengakses BE
 const cors = require('cors')
+// impoet bearer token 
+const bearerToken = require('express-bearer-token')
 
 app.use(cors())
-
+app.use(bearerToken()) // untuk mengambil data auth/token dari request header yang dikirim oleh FE
 // menyambumngkan dengan mySQL
 db.getConnection((err, connection) => {
     if (err) {

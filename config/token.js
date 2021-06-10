@@ -1,0 +1,24 @@
+// membuat token
+const jwt = require('jsonwebtoken')
+
+module.exports = {
+    // middleware atau method function untuk membuat token
+    createToken: (payload) => {
+        return jwt.sign(payload, "ikea$", {
+            // token yang akan kita buat expired dalam berapa jam
+            expiresIn: '12h'
+        })
+    },
+    readToken: (req, res, next) => {
+        jwt.verify(req.token, "ikea$", (err, decoded) => {
+            if (err) {
+                return res.status(401).send("User not authorized")
+            }
+
+            // data hasil terjemahan token
+            req.user = decoded
+
+            next()
+        })
+    }
+}
