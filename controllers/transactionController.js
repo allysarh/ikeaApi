@@ -12,7 +12,7 @@ module.exports = {
             let getCart = `SELECT c.id, p.idProduk, p.nama, p.harga, ps.type, ps.qty as qty_stok, ps.idproduk_stok, c.qty from cart c 
             JOIN tb_products p on c.idProduk = p.idProduk 
             JOIN tb_products_stok ps on ps.idproduk_stok = c.idproduk_stok 
-            WHERE c.id = ${req.params.id};`
+            WHERE c.id = ${req.user.id};`
             // c.id = ${req.body.id};`
 
             getCart = await dbQuery(getCart)
@@ -37,25 +37,26 @@ module.exports = {
     },
     addCart: async (req, res, next) => {
         try {
-            console.log("dr FE", req.body)
+
             // menyederhanakan syntax 
             let insertCart = `Insert into cart set ?`
-            insertCart = await dbQuery(insertCart, req.body)
+            // ❌id usernya diganti jadi diapetin dari token❌
+            insertCart = await dbQuery(insertCart, { id: req.user.id, ...req.body })
             // get hasilnya
-            console.log("re get:", await reGet(req.body.id))
-            res.status(200).send(await reGet(req.body.id))
+            console.log("re get:", await reGet(req.user.id))
+            res.status(200).send(await reGet(req.user.id))
         } catch (error) {
             next(error)
         }
     },
     updateCart: async (req, res, next) => {
         try {
-            let { id, idProduk, idproduk_stok, qty, idcart } = req.body
+            let { idProduk, idproduk_stok, qty, idcart } = req.body
             console.log("req body backend: ", req.body)
 
             let updateCart = `Update cart set qty = ${qty} where idcart = ${db.escape(idcart)};`
             updateCart = await dbQuery(updateCart)
-            res.status(200).send(await reGet(id))
+            res.status(200).send(await reGet(req.user.id))
         } catch (error) {
             next(error)
         }
@@ -72,11 +73,12 @@ module.exports = {
     },
     getTransactions: async (req, res, next) => {
         try {
+            console.log("id--->", req.user.id)
             // let trans = `SELECT idtransaction, invoice, date, id, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus ${req.params.id > 0 ? `where id = ${req.params.id};` : ';'};`
-            let trans = `SELECT idtransaction, invoice, date, t.id, username, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus join tb_user u on t.id = u.id ${req.params.id > 0 ? `where t.id = ${req.params.id};` : ';'};`
+            let trans = `SELECT idtransaction, invoice, date, t.id, username, ongkir, total_payment, note, status from transactions t join status s on t.idstatus = s.idstatus join tb_user u on t.id = u.id ${req.user.id > 0 ? `where t.id = ${req.user.id};` : ';'};`
             trans = await dbQuery(trans)
 
-            console.log("id --->>>", trans[0].idtransaction)
+            // console.log("id --->>>", trans[0].idtransaction)
             let detail = `select idtransaction_detail, idtransaction, d.idProduk, d.idproduk_stok, d.qty, nama, harga, type  from transaction_detail d join tb_products p on p.idProduk = d.idProduk join tb_products_stok s on s.idproduk_stok = d.idproduk_stok;`
 
             detail = await dbQuery(detail)
@@ -90,6 +92,7 @@ module.exports = {
                 })
             })
             console.log(trans.transactionDetail)
+            console.log("trans",trans)
             res.status(200).send(trans)
 
         } catch (error) {
@@ -99,7 +102,9 @@ module.exports = {
     addTransactions: async (req, res, next) => {
         console.log("req body", req.body)
         try {
-            let { id, ongkir, total_payment, note, idstatus, transactionDetail } = req.body
+            let { ongkir, total_payment, note, idstatus, transactionDetail } = req.body
+            let { id } = req.user
+            console.log("id")
             let invoice = '#INVOICE/' + Math.floor(Math.random() * 1000) + String.fromCharCode(Math.floor(Math.random() * 10) + 65)
             let insertQuery = `INSERT into transactions set ?`
             insertQuery = await dbQuery(insertQuery, { invoice, id, ongkir, total_payment, note, idstatus })
@@ -156,10 +161,8 @@ module.exports = {
             next(error)
         }
     },
-    updateTransactions: async (req, res, next) =>{
+    updateTransactions: async (req, res, next) => {
         try {
-            console.log("hai")
-            console.log(req.params.id)
 
             let updateTrans = `UPDATE transactions set idstatus = ${req.body.idstatus} where idtransaction = ${req.params.idtransaction}`
             await dbQuery(updateTrans)

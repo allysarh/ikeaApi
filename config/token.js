@@ -18,6 +18,7 @@ module.exports = {
             // data hasil terjemahan token
             req.user = decoded
 
+            // melanjutkan ke middleware berikutnya
             next()
         })
     }

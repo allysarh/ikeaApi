@@ -74,7 +74,8 @@ module.exports = {
         try {
             console.log("body:", req.body.email)
             if (req.body.email && req.body.password) {
-                let getSQL = `SELECT id, username, email, password, role, status from tb_user u JOIN status s where u.idstatus = s.idstatus and email=${db.escape(req.body.email)} and password=${db.escape(req.body.password)};`
+                let hashPassword = Crypto.createHmac("sha256", "ikeak$$$").update(req.body.password).digest("hex")
+                let getSQL = `SELECT id, username, email, password, role, status from tb_user u JOIN status s where u.idstatus = s.idstatus and email=${db.escape(req.body.email)} and password=${db.escape(hashPassword)};`
                 let getLogin = await dbQuery(getSQL)
                 console.log("getLogin", getLogin)
                 // menambahkan cart
@@ -95,12 +96,14 @@ module.exports = {
                         }
                     })
                 })
-                console.log(getCart)
+    
                 getLogin[0].cart = getCart
 
-                console.log("get login: ",getLogin)
-
-                res.status(200).send(getLogin)
+                // token
+                let {id, username, email ,role, status} = getLogin[0]
+                let token = createToken({id, username, email, role, status})
+                console.log("token",token)
+                res.status(200).send({id, username, email ,role, status, token})
             }
             
         } catch (error) {
@@ -144,7 +147,7 @@ module.exports = {
             let register = await dbQuery(insertSQL)
 
             let getUser = await dbQuery(`Select * from tb_user where id = ${register.insertId}`)
-            let { iduser, username, email, role, idstatus, otp } = getUser[0]
+            let { id, username, email, role, idstatus, otp } = getUser[0]
 
             // fungsi untuk membuat token --> dilewati dulu
             // token untuk proteksi
@@ -188,10 +191,9 @@ module.exports = {
         // })
     },
     keepLogin: async (req, res) => {
-
         try {
             console.log("keep login", req.body)
-            let getSQL = `SELECT * from tb_user WHERE id = ${req.body.id}`
+            let getSQL = `SELECT * from tb_user WHERE id = ${req.user.id}`
             let keepLogin = await dbQuery(getSQL)
             console.log(keepLogin)
             keepLogin[0].cart = []
@@ -216,7 +218,9 @@ module.exports = {
             console.log(getCart)
             keepLogin[0].cart = getCart
 
-            res.status(200).send(keepLogin)
+            let {id, username, email ,role, idstatus} = keepLogin[0]
+            let token = createToken({id, username, email, role, idstatus})
+            res.status(200).send({id, username, email, role, idstatus, token})
         } catch (error) {
             res.status(500).send("Error keep login")
         }
@@ -229,14 +233,12 @@ module.exports = {
     },
     verifyOtp: async (req, res, next) =>{
         try {
-            let get = `SELECT * from tb_user where otp = ${db.escape(req.body.otp)};`
-            get = await dbQuery(get)
-
-            if(get.length > 0){
-                let update = `UPDATE tb_user set idstatus = 11 where id = ${db.escape(get[0].id)};`
-                await dbQuery(update)
-            }
-            res.status(200).send({status: 200, message: get.length})
+            console.log("hasil read token", req.user)
+            
+            let update = `UPDATE tb_user set idstatus = 11 where id = ${db.escape(req.user.id)} and otp=${db.escape(req.body.otp)};`
+            await dbQuery(update)
+            
+            res.status(200).send({status: 200, message: "Verifikasi sukses ✅✅"})
 
         } catch (error) {
             next(error)
@@ -252,15 +254,24 @@ module.exports = {
                 OTP += char.charAt(Math.floor(Math.random() * char.length))
             }
 
-            let updateOTP = `UPDATE tb_user set otp = ${db.escape(OTP)} where email = ${db.escape(req.body.email)};`
+            let hashPassword = Crypto.createHmac("sha256", "ikeak$$$").update(req.body.password).digest("hex")
+            let getUser = await dbQuery(`SELECT * from tb_user where email = ${db.escape(req.body.email)} and password = ${db.escape(hashPassword)};`)
+            let { id, username, email, role, idstatus} = getUser[0]
+            console.log(getUser)
+            
+            
+            let updateOTP = `UPDATE tb_user set otp = ${db.escape(OTP)} where id = ${db.escape(id)};`
             await dbQuery(updateOTP)
+            
+            // fungsi untuk membuat token 
+            let token = createToken({id, username, email, role, idstatus})
 
             let mail = {
                 from: 'Admin Ikea <allysa.rahagustiani@gmail.com>', 
                 to: req.body.email,// penerima sesuai data select dari db
-                subject: '[IKEA WEB]: Verification email', // subject email
-                html: `<div style="text-align: 'center';">Your OTP: <b>${OTP}</b>
-                <a href='http://localhost:3000/verif'>Verify your email</a>
+                subject: '[IKEA WEB]: Re-Verification email', // subject email
+                html: `<div style="text-align: 'center';">Hello, ${username}. Your new OTP: <b>${OTP}</b>
+                <a href='http://localhost:3000/verif/${token}'>Verify your email</a>
                 </div>`
             }
         
