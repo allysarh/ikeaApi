@@ -11,6 +11,10 @@ const bearerToken = require('express-bearer-token')
 
 app.use(cors())
 app.use(bearerToken()) // untuk mengambil data auth/token dari request header yang dikirim oleh FE
+
+// membaca file (GET FILE) -- untuk memberikan akses langsung ke direktori public
+app.use(express.static('public'))
+
 // menyambumngkan dengan mySQL
 db.getConnection((err, connection) => {
     if (err) {
@@ -33,5 +37,7 @@ app.use((error, req, res, next) =>{
     console.log("Handling error: ", error)
     res.status(500).send({status: 'Error', messages: error})
 })
-.listen(PORT, () => console.log("Server Running At:", PORT))
+
+// LISTEN to port
+app.listen(PORT, () => console.log("Server Running At:", PORT))
 

@@ -1,8 +1,9 @@
 const fs = require('fs');
 const { type } = require('os');
 const { join } = require('path');
+const { nextTick } = require('process');
 // import database
-const { db, dbQuery } = require('../config/database');
+const { db, dbQuery, uploader } = require('../config');
 
 
 module.exports = {
@@ -33,7 +34,7 @@ module.exports = {
             let get = await dbQuery(getSQL)
             let getImg = await dbQuery(getImage)
             let getStk = await dbQuery(getStok)
-            
+
             getProdKategori = await dbQuery(getProdKategori)
             console.log("get", getProdKategori)
             // get === results
@@ -61,10 +62,10 @@ module.exports = {
                 item.kategori = []
                 getProdKategori.forEach(b => {
                     if (item.idProduk === b.idProduk) {
-                        item.kategori.push({ idkategori: b.idkategori, kategori: b.kategori})
+                        item.kategori.push({ idkategori: b.idkategori, kategori: b.kategori })
                     }
                 })
-                
+
             });
             res.status(200).send(get)
 
@@ -127,19 +128,120 @@ module.exports = {
         //     })
         // })
     },
-    addProducts: async (req, res) => {
+    addProducts: async (req, res, next) => {
         try {
             // console.log(req.body) 
-            let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
-            let postImg = `INSERT into tb_products_image values `
-            let postStk = `INSERT into tb_products_stok values `
-            let postKategori = `INSERT into produk_kategori values `
-            // // get all id kategori dari child hingga parent (single path)
-            let kategori = `WITH RECURSIVE kategori_path (idkategori, kategori, parentId) AS
+
+            // let postProduk = `INSERT into tb_products values (null, ${db.escape(req.body.nama)}, ${db.escape(req.body.deskripsi)}, ${db.escape(req.body.harga)}, ${db.escape(req.body.brand)}, ${db.escape(req.body.idstatus)});`
+            // let postImg = `INSERT into tb_products_image values `
+            // let postStk = `INSERT into tb_products_stok values `
+            // let postKategori = `INSERT into produk_kategori values `
+            // // // get all id kategori dari child hingga parent (single path)
+            // let kategori = `WITH RECURSIVE kategori_path (idkategori, kategori, parentId) AS
+            // (
+            //     SELECT idkategori, kategori, parentId
+            //         FROM kategori
+            //         WHERE idkategori = ${req.body.idkategori} -- kategori paling bawah yg dipilih
+            //         UNION ALL
+            //     SELECT c.idkategori, c.kategori, c.parentId
+            //         FROM kategori_path AS cp JOIN kategori AS c
+            //         ON cp.parentId = c.idkategori
+            // )
+            // SELECT * FROM kategori_path;`
+
+            // kategori = await dbQuery(kategori)
+            // // console.log("kategori", kategori)
+
+            // let post = await dbQuery(postProduk)
+            // // tambahkan query untuk insert data ke table product_category
+
+            // let dataKategori = kategori.map(item => {
+            //     return `(null, ${post.insertId}, ${item.idkategori})`
+            // })
+            // console.log(postKategori + dataKategori)
+            // await dbQuery(postKategori + dataKategori)
+
+            // let dataStk = []
+            // req.body.stok.forEach(item => {
+            //     dataStk.push(`(null, ${db.escape(item.type)}, 
+            //     ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
+            // })
+            // console.log(postImg + dataImg)
+            // await dbQuery(postStk + dataStk)
+
+            // // UPLOAD IMAGE
+            // let dataImg = []
+            // req.body.images.forEach(item => {
+            //     dataImg.push(`(null, ${post.insertId}, ${db.escape(item.images)})`)
+            // })
+            // await dbQuery(postImg + dataImg)
+
+            //CARA 2
+            // let postProduk = `INSERT into tb_products values (null, ${db.escape(nama)}, ${db.escape(deskripsi)}, ${db.escape(harga)}, ${db.escape(brand)}, ${db.escape(idstatus)});`
+            // let postImg = `INSERT into tb_products_image values `
+            // let postStk = `INSERT into tb_products_stok values `
+            // let postKategori = `INSERT into produk_kategori values `
+            // // // get all id kategori dari child hingga parent (single path)
+            // let kategori = `WITH RECURSIVE kategori_path (idkategori, kategori, parentId) AS
+            // (
+            //     SELECT idkategori, kategori, parentId
+            //         FROM kategori
+            //         WHERE idkategori = ${idkategori} -- kategori paling bawah yg dipilih
+            //         UNION ALL
+            //     SELECT c.idkategori, c.kategori, c.parentId
+            //         FROM kategori_path AS cp JOIN kategori AS c
+            //         ON cp.parentId = c.idkategori
+            // )
+            // SELECT * FROM kategori_path;`
+
+            // kategori = await dbQuery(kategori)
+            // // console.log("kategori", kategori)
+
+            // let post = await dbQuery(postProduk)
+            // // tambahkan query untuk insert data ke table product_category
+
+            // let dataKategori = kategori.map(item => {
+            //     return `(null, ${post.insertId}, ${item.idkategori})`
+            // })
+            // console.log(postKategori + dataKategori)
+            // await dbQuery(postKategori + dataKategori)
+
+            // let dataStk = []
+            // stok.forEach(item => {
+            //     dataStk.push(`(null, ${db.escape(item.type)}, 
+            //     ${db.escape(idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
+            // })
+            // console.log(postImg + dataImg)
+            // await dbQuery(postStk + dataStk)
+
+            //UPLOAD IMAGE BENTUK FILE
+            //fields: menangkan file dari front end
+            const upload = uploader('/images', 'IMG').fields([{ name: 'images' }])
+            upload(req, res, async (error) => {
+                // if(error){ // menangkap error upload
+                //     // hapus gambar yang sudah di upload
+                //     fs.unlinkSync(`./public/images/${req.files.images[0].filename}`)
+                //     next(error)
+                // }
+                try {
+                    let { nama, deskripsi, harga, brand, idstatus, idkategori, stok } = JSON.parse(req.body.data)
+                    console.log(nama, deskripsi, harga, brand, idstatus, idkategori, stok)
+                    const { images } = req.files
+                    console.log("cek file upload images:", images)
+                    console.log("data req.body==> ", JSON.parse(req.body.data))
+                    // tambahkan fungsi query untuk tambah data produk
+                    // images dan nama filenya images/nama file
+                    console.log(`images/${images[0].filename}`)
+                    let postProduk = `INSERT into tb_products values (null, ${db.escape(nama)}, ${db.escape(deskripsi)}, ${db.escape(harga)}, ${db.escape(brand)}, ${db.escape(idstatus)});`
+                    let postImg = `INSERT into tb_products_image values `
+                    let postStk = `INSERT into tb_products_stok values `
+                    let postKategori = `INSERT into produk_kategori values `
+                    // // get all id kategori dari child hingga parent (single path)
+                    let kategori = `WITH RECURSIVE kategori_path (idkategori, kategori, parentId) AS
             (
                 SELECT idkategori, kategori, parentId
                     FROM kategori
-                    WHERE idkategori = ${req.body.idkategori} -- kategori paling bawah yg dipilih
+                    WHERE idkategori = ${idkategori} -- kategori paling bawah yg dipilih
                     UNION ALL
                 SELECT c.idkategori, c.kategori, c.parentId
                     FROM kategori_path AS cp JOIN kategori AS c
@@ -147,31 +249,38 @@ module.exports = {
             )
             SELECT * FROM kategori_path;`
 
-            kategori = await dbQuery(kategori)
-            // console.log("kategori", kategori)
+                    kategori = await dbQuery(kategori)
+                    // console.log("kategori", kategori)
 
-            let post = await dbQuery(postProduk)
-            // tambahkan query untuk insert data ke table product_category
+                    let post = await dbQuery(postProduk)
+                    // tambahkan query untuk insert data ke table product_category
 
-            let dataKategori = kategori.map(item => {
-                return `(null, ${post.insertId}, ${item.idkategori})`
-            })
-            console.log(postKategori + dataKategori)
-            await dbQuery(postKategori + dataKategori)
+                    let dataKategori = kategori.map(item => {
+                        return `(null, ${post.insertId}, ${item.idkategori})`
+                    })
+                    console.log(postKategori + dataKategori)
+                    await dbQuery(postKategori + dataKategori)
 
-            let dataImg = []
-            req.body.images.forEach(item => {
-                dataImg.push(`(null, ${post.insertId}, ${db.escape(item.images)})`)
+                    let dataStk = []
+                    stok.forEach(item => {
+                        dataStk.push(`(null, ${db.escape(item.type)}, 
+                ${db.escape(idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
+                    })
+                    
+                    await dbQuery(postStk + dataStk)
+
+                    let postImgFile = `INSERT into tb_products_image values (null, ${post.insertId}, ${db.escape(`images/${images[0].filename}`)})`
+                    await dbQuery(postImgFile)
+
+                } catch (err) { // error catch
+                    // hapus gambar yang sudah di upload
+                    fs.unlinkSync(`./public/images/${req.files.images[0].filename}`)
+                    // error db query
+                    console.log("error catch", err)
+                    // error dari update
+                    next(error)
+                }
             })
-            console.log(dataImg)
-            let dataStk = []
-            req.body.stok.forEach(item => {
-                dataStk.push(`(null, ${db.escape(item.type)}, 
-                ${db.escape(req.body.idstatus)}, ${db.escape(item.qty)}, ${post.insertId})`)
-            })
-            console.log(postImg + dataImg)
-            await dbQuery(postImg + dataImg)
-            await dbQuery(postStk + dataStk)
 
             res.status(200).send("Insert product success!✅")
         } catch (error) {

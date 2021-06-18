@@ -110,7 +110,7 @@ module.exports = {
             insertQuery = await dbQuery(insertQuery, { invoice, id, ongkir, total_payment, note, idstatus })
             console.log("CO SUCCESS", insertQuery)
 
-            let detailQuery = `INSERT into transaction_detail (idtransaction, idProduk, idproduk_stok, qty) values ?`
+            let detailQuery = `INSERT into transaction_detail (idtransaction, idProduk, idproduk_stok, qty) `
             // EKSEKUSI QUERY SQL PADA NODEJS:
             let dataDetail = transactionDetail.map(item => [insertQuery.insertId, item.idProduk, item.idproduk_stok, item.qty])
             console.log(dataDetail)

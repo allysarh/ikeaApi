@@ -192,7 +192,8 @@ module.exports = {
     },
     keepLogin: async (req, res) => {
         try {
-            console.log("keep login", req.body)
+            // console.log("keep login", req.body)
+            console.log("keep login", req.user.id)
             let getSQL = `SELECT * from tb_user WHERE id = ${req.user.id}`
             let keepLogin = await dbQuery(getSQL)
             console.log(keepLogin)
@@ -215,7 +216,7 @@ module.exports = {
                     }
                 })
             })
-            console.log(getCart)
+            // console.log(getCart)
             keepLogin[0].cart = getCart
 
             let {id, username, email ,role, idstatus} = keepLogin[0]

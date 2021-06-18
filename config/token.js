@@ -10,6 +10,7 @@ module.exports = {
         })
     },
     readToken: (req, res, next) => {
+        console.log("token BE -->",req.token)
         jwt.verify(req.token, "ikea$", (err, decoded) => {
             if (err) {
                 return res.status(401).send("User not authorized")
