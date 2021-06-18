@@ -10,11 +10,11 @@ const mysql = require('mysql')
 const util = require('util')
 
 const db = mysql.createPool({
-    host: 'localhost',
-    user: 'allysarh',
-    password: 'Fivestars5',
-    database: 'db_ikea',
-    port: 3306,
+    host: process.env.HOSTSQL,
+    user: process.env.USERSQL,
+    password: process.env.PASSWORDSQL,
+    database: process.env.DBSQL,
+    port: process.env.PORTSQL,
     //multiple statement --> bisa double query
     multipleStatements: true
 })

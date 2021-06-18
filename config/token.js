@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken')
 module.exports = {
     // middleware atau method function untuk membuat token
     createToken: (payload) => {
-        return jwt.sign(payload, "ikea$", {
+        return jwt.sign(payload, process.env.KEYTKN, {
             // token yang akan kita buat expired dalam berapa jam
             expiresIn: '12h'
         })
